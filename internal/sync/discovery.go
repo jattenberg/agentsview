@@ -412,3 +412,96 @@ func geminiPathHash(path string) string {
 	h := sha256.Sum256([]byte(path))
 	return fmt.Sprintf("%x", h)
 }
+
+// DiscoverCursorSessions finds all parent agent transcript
+// JSONL files under the Cursor projects directory. Subagent
+// files are not discovered separately; they are merged into
+// parent sessions during parsing.
+//
+// Layout: <cursorDir>/<workspace-slug>/agent-transcripts/<uuid>/<uuid>.jsonl
+func DiscoverCursorSessions(
+	cursorDir string,
+) []DiscoveredFile {
+	if cursorDir == "" {
+		return nil
+	}
+
+	workspaces, err := os.ReadDir(cursorDir)
+	if err != nil {
+		return nil
+	}
+
+	var files []DiscoveredFile
+	for _, ws := range workspaces {
+		if !ws.IsDir() {
+			continue
+		}
+		slug := ws.Name()
+		project := parser.CursorProjectFromSlug(slug)
+		if project == "" {
+			project = "unknown"
+		}
+
+		transcriptsDir := filepath.Join(
+			cursorDir, slug, "agent-transcripts",
+		)
+		sessionDirs, err := os.ReadDir(transcriptsDir)
+		if err != nil {
+			continue
+		}
+
+		for _, sd := range sessionDirs {
+			if !sd.IsDir() {
+				continue
+			}
+			sessionID := sd.Name()
+			candidate := filepath.Join(
+				transcriptsDir, sessionID,
+				sessionID+".jsonl",
+			)
+			if _, err := os.Stat(candidate); err != nil {
+				continue
+			}
+			files = append(files, DiscoveredFile{
+				Path:    candidate,
+				Project: project,
+				Agent:   parser.AgentCursor,
+			})
+		}
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Path < files[j].Path
+	})
+	return files
+}
+
+// FindCursorSourceFile locates a Cursor session JSONL file by
+// its UUID. Searches across all workspace directories.
+func FindCursorSourceFile(
+	cursorDir, sessionID string,
+) string {
+	if cursorDir == "" || !isValidSessionID(sessionID) {
+		return ""
+	}
+
+	workspaces, err := os.ReadDir(cursorDir)
+	if err != nil {
+		return ""
+	}
+
+	for _, ws := range workspaces {
+		if !ws.IsDir() {
+			continue
+		}
+		candidate := filepath.Join(
+			cursorDir, ws.Name(),
+			"agent-transcripts", sessionID,
+			sessionID+".jsonl",
+		)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	return ""
+}

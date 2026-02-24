@@ -24,12 +24,20 @@
   );
 
   let agentColor = $derived(
-    session.agent === "codex"
-      ? "var(--accent-green)"
-      : session.agent === "opencode"
-        ? "var(--accent-purple)"
-        : "var(--accent-blue)",
+    agentDotColor(session.agent),
   );
+
+  function agentDotColor(agent: string): string {
+    switch (agent) {
+      case "codex":
+        return "var(--accent-green)";
+      case "opencode":
+      case "cursor":
+        return "var(--accent-purple)";
+      default:
+        return "var(--accent-blue)";
+    }
+  }
 
   let displayName = $derived(
     session.first_message

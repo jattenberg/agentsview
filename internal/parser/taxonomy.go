@@ -55,6 +55,27 @@ func NormalizeToolCategory(rawName string) string {
 	case "task":
 		return "Task"
 
+	// Cursor tools
+	case "Shell":
+		return "Bash"
+	case "StrReplace":
+		return "Edit"
+	case "Delete":
+		return "Write"
+	case "SemanticSearch":
+		return "Grep"
+	case "ReadLints":
+		return "Read"
+	case "EditNotebook":
+		return "Write"
+	case "TodoWrite", "SwitchMode":
+		return "Other"
+	case "WebSearch", "WebFetch",
+		"GenerateImage", "AskQuestion",
+		"CreatePlan", "CallMcpTool",
+		"FetchMcpResource":
+		return "Other"
+
 	default:
 		return "Other"
 	}

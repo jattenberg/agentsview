@@ -184,7 +184,7 @@
             <span class="item-dot" style:background={
               session.agent === "codex"
                 ? "var(--accent-green)"
-                : session.agent === "opencode"
+                : (session.agent === "opencode" || session.agent === "cursor")
                   ? "var(--accent-purple)"
                   : "var(--accent-blue)"
             }></span>

@@ -17,6 +17,7 @@ type testEnv struct {
 	claudeDir string
 	codexDir  string
 	geminiDir string
+	cursorDir string
 	db        *db.DB
 	engine    *sync.Engine
 }
@@ -31,12 +32,13 @@ func setupTestEnv(t *testing.T) *testEnv {
 		claudeDir: t.TempDir(),
 		codexDir:  t.TempDir(),
 		geminiDir: t.TempDir(),
+		cursorDir: t.TempDir(),
 		db:        dbtest.OpenTestDB(t),
 	}
 
 	env.engine = sync.NewEngine(
 		env.db, env.claudeDir, env.codexDir,
-		env.geminiDir, "", "local",
+		env.geminiDir, "", env.cursorDir, "local",
 	)
 	return env
 }
@@ -84,6 +86,22 @@ func (e *testEnv) writeGeminiSession(
 ) string {
 	t.Helper()
 	return e.writeSession(t, e.geminiDir, relPath, content)
+}
+
+// writeCursorSession creates a JSONL session file under the
+// Cursor projects directory with the expected directory layout.
+func (e *testEnv) writeCursorSession(
+	t *testing.T, workspace, uuid, content string,
+) string {
+	t.Helper()
+	return e.writeSession(
+		t, e.cursorDir,
+		filepath.Join(
+			workspace, "agent-transcripts",
+			uuid, uuid+".jsonl",
+		),
+		content,
+	)
 }
 
 func TestSyncEngineIntegration(t *testing.T) {
@@ -842,7 +860,7 @@ func TestSyncPathsTrailingSlashDirs(t *testing.T) {
 	codexDir := t.TempDir() + "/"
 	database := dbtest.OpenTestDB(t)
 	engine := sync.NewEngine(
-		database, claudeDir, codexDir, "", "", "local",
+		database, claudeDir, codexDir, "", "", "", "local",
 	)
 
 	content := testjsonl.NewSessionBuilder().
@@ -1082,5 +1100,152 @@ func TestSyncPathsClaudeRejectsNested(t *testing.T) {
 			"nested Claude path should be rejected " +
 				"(only <project>/<session>.jsonl allowed)",
 		)
+	}
+}
+
+func TestSyncPathsCursor(t *testing.T) {
+	env := setupTestEnv(t)
+
+	uuid := "aaaa-bbbb-cccc-dddd"
+	content := testjsonl.NewSessionBuilder().
+		AddCursorUser("What does this do?").
+		AddCursorAssistant("It does X.").
+		String()
+
+	path := env.writeCursorSession(
+		t, "Users-alice-development-myapp",
+		uuid, content,
+	)
+
+	env.engine.SyncPaths([]string{path})
+
+	assertSessionState(
+		t, env.db, "cursor:"+uuid,
+		func(sess *db.Session) {
+			if sess.Agent != "cursor" {
+				t.Errorf("agent = %q, want cursor",
+					sess.Agent)
+			}
+			if sess.MessageCount != 2 {
+				t.Errorf(
+					"message_count = %d, want 2",
+					sess.MessageCount,
+				)
+			}
+			if sess.Project != "myapp" {
+				t.Errorf("project = %q, want myapp",
+					sess.Project)
+			}
+		},
+	)
+}
+
+func TestSyncPathsCursorRejectsSubagent(t *testing.T) {
+	env := setupTestEnv(t)
+
+	parentUUID := "parent-1111"
+	subUUID := "sub-2222"
+
+	parentContent := testjsonl.NewSessionBuilder().
+		AddCursorUser("parent question").
+		String()
+	env.writeCursorSession(
+		t, "Users-alice-development-app",
+		parentUUID, parentContent,
+	)
+
+	// Subagent file — should be rejected by classifyOnePath
+	subContent := testjsonl.NewSessionBuilder().
+		AddCursorUser("sub task").
+		String()
+	subPath := env.writeSession(
+		t, env.cursorDir,
+		filepath.Join(
+			"Users-alice-development-app",
+			"agent-transcripts", parentUUID,
+			"subagents", subUUID+".jsonl",
+		),
+		subContent,
+	)
+
+	env.engine.SyncPaths([]string{subPath})
+
+	sess, _ := env.db.GetSession(
+		context.Background(), "cursor:"+subUUID,
+	)
+	if sess != nil {
+		t.Error("subagent path should be rejected")
+	}
+}
+
+func TestSyncPathsCursorRejectsNonTranscript(t *testing.T) {
+	env := setupTestEnv(t)
+
+	// Write a file that's not under agent-transcripts
+	path := env.writeSession(
+		t, env.cursorDir,
+		filepath.Join(
+			"Users-alice-development-app",
+			"terminals", "1.txt",
+		),
+		"terminal output",
+	)
+
+	env.engine.SyncPaths([]string{path})
+
+	// Should produce zero new sessions
+	stats := env.engine.LastSyncStats()
+	if stats.Synced > 0 {
+		t.Error("non-transcript file should be ignored")
+	}
+}
+
+func TestSyncAllIncludesCursor(t *testing.T) {
+	env := setupTestEnv(t)
+
+	uuid := "cursor-sync-all-test"
+	content := testjsonl.NewSessionBuilder().
+		AddCursorUser("sync all question").
+		AddCursorAssistant("sync all answer").
+		String()
+
+	env.writeCursorSession(
+		t, "Users-bob-code-project",
+		uuid, content,
+	)
+
+	stats := env.engine.SyncAll(nil)
+
+	if stats.TotalSessions < 1 {
+		t.Errorf("TotalSessions = %d, want >= 1",
+			stats.TotalSessions)
+	}
+
+	assertSessionState(
+		t, env.db, "cursor:"+uuid,
+		func(sess *db.Session) {
+			if sess.Agent != "cursor" {
+				t.Errorf("agent = %q, want cursor",
+					sess.Agent)
+			}
+		},
+	)
+}
+
+func TestCursorFindSourceFile(t *testing.T) {
+	env := setupTestEnv(t)
+
+	uuid := "find-source-test"
+	env.writeCursorSession(
+		t, "Users-alice-development-app",
+		uuid, "{}",
+	)
+
+	got := env.engine.FindSourceFile("cursor:" + uuid)
+	if got == "" {
+		t.Error("FindSourceFile returned empty")
+	}
+	if !filepath.IsAbs(got) {
+		t.Errorf("path not absolute: %q", got)
 	}
 }
