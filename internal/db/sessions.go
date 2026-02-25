@@ -195,17 +195,17 @@ func buildSessionFilter(f SessionFilter) (string, []any) {
 	}
 	if f.Date != "" {
 		preds = append(preds,
-			"date(COALESCE(started_at, created_at)) = ?")
+			"date(COALESCE(started_at, ended_at, created_at)) = ?")
 		args = append(args, f.Date)
 	}
 	if f.DateFrom != "" {
 		preds = append(preds,
-			"date(COALESCE(started_at, created_at)) >= ?")
+			"date(COALESCE(started_at, ended_at, created_at)) >= ?")
 		args = append(args, f.DateFrom)
 	}
 	if f.DateTo != "" {
 		preds = append(preds,
-			"date(COALESCE(started_at, created_at)) <= ?")
+			"date(COALESCE(started_at, ended_at, created_at)) <= ?")
 		args = append(args, f.DateTo)
 	}
 	if f.MinMessages > 0 {

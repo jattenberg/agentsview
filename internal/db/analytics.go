@@ -145,7 +145,7 @@ func (db *DB) filteredSessionIDs(
 	ctx context.Context, f AnalyticsFilter,
 ) (map[string]bool, error) {
 	loc := f.location()
-	dateCol := "COALESCE(s.started_at, s.created_at)"
+	dateCol := "COALESCE(s.started_at, s.ended_at, s.created_at)"
 	where, args := f.buildWhere(dateCol)
 
 	query := `SELECT s.id, m.timestamp
@@ -275,7 +275,7 @@ func (db *DB) GetAnalyticsSummary(
 	ctx context.Context, f AnalyticsFilter,
 ) (AnalyticsSummary, error) {
 	loc := f.location()
-	dateCol := "COALESCE(started_at, created_at)"
+	dateCol := "COALESCE(started_at, ended_at, created_at)"
 	where, args := f.buildWhere(dateCol)
 
 	var timeIDs map[string]bool
@@ -460,7 +460,7 @@ func (db *DB) GetAnalyticsActivity(
 		granularity = "day"
 	}
 	loc := f.location()
-	dateCol := "COALESCE(s.started_at, s.created_at)"
+	dateCol := "COALESCE(s.started_at, s.ended_at, s.created_at)"
 	where, args := f.buildWhere(dateCol)
 
 	var timeIDs map[string]bool
@@ -646,7 +646,7 @@ func (db *DB) GetAnalyticsHeatmap(
 	}
 
 	loc := f.location()
-	dateCol := "COALESCE(started_at, created_at)"
+	dateCol := "COALESCE(started_at, ended_at, created_at)"
 	where, args := f.buildWhere(dateCol)
 
 	var timeIDs map[string]bool
@@ -804,7 +804,7 @@ func (db *DB) GetAnalyticsProjects(
 	ctx context.Context, f AnalyticsFilter,
 ) (ProjectsAnalyticsResponse, error) {
 	loc := f.location()
-	dateCol := "COALESCE(started_at, created_at)"
+	dateCol := "COALESCE(started_at, ended_at, created_at)"
 	where, args := f.buildWhere(dateCol)
 
 	var timeIDs map[string]bool
@@ -950,7 +950,7 @@ func (db *DB) GetAnalyticsHourOfWeek(
 	ctx context.Context, f AnalyticsFilter,
 ) (HourOfWeekResponse, error) {
 	loc := f.location()
-	dateCol := "COALESCE(s.started_at, s.created_at)"
+	dateCol := "COALESCE(s.started_at, s.ended_at, s.created_at)"
 	where, args := f.buildWhere(dateCol)
 
 	query := `SELECT ` + dateCol + `, m.timestamp
@@ -1122,7 +1122,7 @@ func (db *DB) GetAnalyticsSessionShape(
 	ctx context.Context, f AnalyticsFilter,
 ) (SessionShapeResponse, error) {
 	loc := f.location()
-	dateCol := "COALESCE(started_at, created_at)"
+	dateCol := "COALESCE(started_at, ended_at, created_at)"
 	where, args := f.buildWhere(dateCol)
 
 	var timeIDs map[string]bool
@@ -1286,7 +1286,7 @@ func (db *DB) GetAnalyticsTools(
 	ctx context.Context, f AnalyticsFilter,
 ) (ToolsAnalyticsResponse, error) {
 	loc := f.location()
-	dateCol := "COALESCE(started_at, created_at)"
+	dateCol := "COALESCE(started_at, ended_at, created_at)"
 	where, args := f.buildWhere(dateCol)
 
 	var timeIDs map[string]bool
@@ -1632,7 +1632,7 @@ func (db *DB) GetAnalyticsVelocity(
 	ctx context.Context, f AnalyticsFilter,
 ) (VelocityResponse, error) {
 	loc := f.location()
-	dateCol := "COALESCE(started_at, created_at)"
+	dateCol := "COALESCE(started_at, ended_at, created_at)"
 	where, args := f.buildWhere(dateCol)
 
 	var timeIDs map[string]bool
@@ -1932,7 +1932,7 @@ func (db *DB) GetAnalyticsTopSessions(
 		metric = "messages"
 	}
 	loc := f.location()
-	dateCol := "COALESCE(started_at, created_at)"
+	dateCol := "COALESCE(started_at, ended_at, created_at)"
 	where, args := f.buildWhere(dateCol)
 
 	var timeIDs map[string]bool
