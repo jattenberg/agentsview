@@ -956,7 +956,7 @@ func (db *DB) GetAnalyticsHourOfWeek(
 	query := `SELECT ` + dateCol + `, m.timestamp
 		FROM sessions s
 		JOIN messages m ON m.session_id = s.id
-		WHERE ` + where + ` AND m.timestamp != ''`
+		WHERE ` + where
 
 	rows, err := db.reader.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -979,7 +979,10 @@ func (db *DB) GetAnalyticsHourOfWeek(
 		}
 		t, ok := localTime(msgTS, loc)
 		if !ok {
-			continue
+			t, ok = localTime(sessTS, loc)
+			if !ok {
+				continue
+			}
 		}
 		// Go Sunday=0, convert to ISO Monday=0
 		dow := (int(t.Weekday()) + 6) % 7
