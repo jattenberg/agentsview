@@ -60,8 +60,9 @@ func main() {
 func printUsage() {
 	fmt.Printf(`agentsview %s - local web viewer for AI agent sessions
 
-Syncs Claude Code, Codex, and Gemini CLI session data into SQLite,
-serves an analytics dashboard and session browser via a local web UI.
+Syncs Claude Code, Codex, Gemini CLI, OpenCode, and Cursor session data
+into SQLite, serves an analytics dashboard and session browser via a local
+web UI.
 
 Usage:
   agentsview [flags]          Start the server (default command)
@@ -93,6 +94,8 @@ Environment variables:
   CLAUDE_PROJECTS_DIR     Claude Code projects directory
   CODEX_SESSIONS_DIR      Codex sessions directory
   GEMINI_DIR              Gemini CLI directory
+  OPENCODE_DIR            OpenCode data directory
+  CURSOR_PROJECTS_DIR     Cursor projects directory
   AGENT_VIEWER_DATA_DIR   Data directory (database, config)
 
 Data is stored in ~/.agentsview/ by default.
@@ -107,7 +110,8 @@ func runServe(args []string) {
 
 	engine := sync.NewEngine(
 		database, cfg.ClaudeProjectDir,
-		cfg.CodexSessionsDir, cfg.GeminiDir, "local",
+		cfg.CodexSessionsDir, cfg.GeminiDir,
+		cfg.OpenCodeDir, cfg.CursorProjectsDir, "local",
 	)
 
 	runInitialSync(engine)
@@ -238,12 +242,42 @@ func startFileWatcher(
 			dirs += n
 		}
 	}
+	dirs += watchCursorTranscripts(watcher, cfg.CursorProjectsDir)
 	fmt.Printf(
 		"Watching %d directories for changes (%s)\n",
 		dirs, time.Since(t).Round(time.Millisecond),
 	)
 	watcher.Start()
 	return watcher.Stop
+}
+
+// watchCursorTranscripts watches only agent-transcripts
+// subdirectories under the Cursor projects directory to avoid
+// noise from MCP, terminal, plan, and snapshot files.
+func watchCursorTranscripts(
+	watcher *sync.Watcher, cursorDir string,
+) int {
+	if cursorDir == "" {
+		return 0
+	}
+	workspaces, err := os.ReadDir(cursorDir)
+	if err != nil {
+		return 0
+	}
+	var count int
+	for _, ws := range workspaces {
+		if !ws.IsDir() {
+			continue
+		}
+		transcripts := filepath.Join(
+			cursorDir, ws.Name(), "agent-transcripts",
+		)
+		if _, err := os.Stat(transcripts); err == nil {
+			n, _ := watcher.WatchRecursive(transcripts)
+			count += n
+		}
+	}
+	return count
 }
 
 func startPeriodicSync(engine *sync.Engine) {

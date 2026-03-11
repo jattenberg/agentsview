@@ -405,3 +405,139 @@ func TestFindGeminiSourceFileEmptyDir(t *testing.T) {
 		t.Errorf("expected empty, got %q", got)
 	}
 }
+
+// --- Cursor discovery tests ---
+
+func TestDiscoverCursorSessions(t *testing.T) {
+	uuid1 := "aaaa-bbbb-cccc-dddd"
+	uuid2 := "eeee-ffff-1111-2222"
+
+	dir := setupTestDir(t, []string{
+		filepath.Join(
+			"Users-alice-development-myapp",
+			"agent-transcripts", uuid1, uuid1+".jsonl",
+		),
+		filepath.Join(
+			"Users-alice-development-myapp",
+			"agent-transcripts", uuid2, uuid2+".jsonl",
+		),
+		// Subagent file -- should NOT be discovered
+		filepath.Join(
+			"Users-alice-development-myapp",
+			"agent-transcripts", uuid1,
+			"subagents", "sub-1234.jsonl",
+		),
+	})
+
+	files := DiscoverCursorSessions(dir)
+
+	assertDiscoveredFiles(t, files, []string{
+		uuid1 + ".jsonl",
+		uuid2 + ".jsonl",
+	}, parser.AgentCursor)
+}
+
+func TestDiscoverCursorSessionsMultipleWorkspaces(t *testing.T) {
+	uuid1 := "aaaa-1111"
+	uuid2 := "bbbb-2222"
+
+	dir := setupTestDir(t, []string{
+		filepath.Join(
+			"Users-alice-development-app1",
+			"agent-transcripts", uuid1, uuid1+".jsonl",
+		),
+		filepath.Join(
+			"Users-alice-development-app2",
+			"agent-transcripts", uuid2, uuid2+".jsonl",
+		),
+	})
+
+	files := DiscoverCursorSessions(dir)
+	assertDiscoveredFiles(t, files, []string{
+		uuid1 + ".jsonl",
+		uuid2 + ".jsonl",
+	}, parser.AgentCursor)
+}
+
+func TestDiscoverCursorSessionsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	files := DiscoverCursorSessions(dir)
+	assertDiscoveredFiles(t, files, nil, parser.AgentCursor)
+}
+
+func TestDiscoverCursorSessionsNonexistent(t *testing.T) {
+	files := DiscoverCursorSessions(
+		filepath.Join(t.TempDir(), "nope"),
+	)
+	if files != nil {
+		t.Errorf("expected nil, got %d files", len(files))
+	}
+}
+
+func TestDiscoverCursorSessionsEmptyDir(t *testing.T) {
+	files := DiscoverCursorSessions("")
+	if files != nil {
+		t.Errorf("expected nil, got %d files", len(files))
+	}
+}
+
+func TestDiscoverCursorSessionsSkipsMCPFiles(t *testing.T) {
+	dir := setupTestDir(t, []string{
+		filepath.Join(
+			"Users-alice-development-app",
+			"mcps", "server.json",
+		),
+		filepath.Join(
+			"Users-alice-development-app",
+			"terminals", "1.txt",
+		),
+	})
+
+	files := DiscoverCursorSessions(dir)
+	assertDiscoveredFiles(t, files, nil, parser.AgentCursor)
+}
+
+func TestFindCursorSourceFile(t *testing.T) {
+	uuid := "aaaa-bbbb-cccc-dddd"
+	dir := setupTestDir(t, []string{
+		filepath.Join(
+			"Users-alice-development-app",
+			"agent-transcripts", uuid, uuid+".jsonl",
+		),
+	})
+	expected := filepath.Join(
+		dir, "Users-alice-development-app",
+		"agent-transcripts", uuid, uuid+".jsonl",
+	)
+
+	got := FindCursorSourceFile(dir, uuid)
+	if got != expected {
+		t.Errorf("got %q, want %q", got, expected)
+	}
+
+	// Nonexistent
+	got = FindCursorSourceFile(dir, "nonexistent")
+	if got != "" {
+		t.Errorf("expected empty, got %q", got)
+	}
+}
+
+func TestFindCursorSourceFileEmptyDir(t *testing.T) {
+	got := FindCursorSourceFile("", "aaaa-bbbb")
+	if got != "" {
+		t.Errorf("expected empty, got %q", got)
+	}
+}
+
+func TestFindCursorSourceFileInvalidID(t *testing.T) {
+	dir := t.TempDir()
+	for _, id := range []string{"", "../etc", "a/b", "a b"} {
+		got := FindCursorSourceFile(dir, id)
+		if got != "" {
+			t.Errorf(
+				"FindCursorSourceFile(%q) = %q, want empty",
+				id, got,
+			)
+		}
+	}
+}

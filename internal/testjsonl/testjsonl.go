@@ -418,6 +418,57 @@ func GeminiSessionJSON(
 	return string(b)
 }
 
+// CursorUserJSON returns a Cursor user message as a JSON
+// string. The text is wrapped in message.content[{type:text}].
+func CursorUserJSON(text string) string {
+	m := map[string]any{
+		"role": "user",
+		"message": map[string]any{
+			"content": []map[string]string{
+				{"type": "text", "text": text},
+			},
+		},
+	}
+	return mustMarshal(m)
+}
+
+// CursorAssistantJSON returns a Cursor assistant message as a
+// JSON string.
+func CursorAssistantJSON(text string) string {
+	m := map[string]any{
+		"role": "assistant",
+		"message": map[string]any{
+			"content": []map[string]string{
+				{"type": "text", "text": text},
+			},
+		},
+	}
+	return mustMarshal(m)
+}
+
+// CursorUserWithQueryJSON returns a Cursor user message with
+// scaffolding wrapping a <user_query> tag.
+func CursorUserWithQueryJSON(query, scaffold string) string {
+	full := scaffold + "\n<user_query>\n" + query + "\n</user_query>"
+	return CursorUserJSON(full)
+}
+
+// AddCursorUser appends a Cursor user message line.
+func (b *SessionBuilder) AddCursorUser(
+	text string,
+) *SessionBuilder {
+	b.lines = append(b.lines, CursorUserJSON(text))
+	return b
+}
+
+// AddCursorAssistant appends a Cursor assistant message line.
+func (b *SessionBuilder) AddCursorAssistant(
+	text string,
+) *SessionBuilder {
+	b.lines = append(b.lines, CursorAssistantJSON(text))
+	return b
+}
+
 func mustMarshal(v any) string {
 	b, err := json.Marshal(v)
 	if err != nil {

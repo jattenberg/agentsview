@@ -40,6 +40,42 @@ func NormalizeToolCategory(rawName string) string {
 	case "search_files", "grep":
 		return "Grep"
 
+	// OpenCode tools (lowercase variants)
+	// Note: "grep" is handled above in the Gemini section.
+	case "read":
+		return "Read"
+	case "edit":
+		return "Edit"
+	case "write":
+		return "Write"
+	case "bash":
+		return "Bash"
+	case "glob":
+		return "Glob"
+	case "task":
+		return "Task"
+
+	// Cursor tools
+	case "Shell":
+		return "Bash"
+	case "StrReplace":
+		return "Edit"
+	case "Delete":
+		return "Write"
+	case "SemanticSearch":
+		return "Grep"
+	case "ReadLints":
+		return "Read"
+	case "EditNotebook":
+		return "Write"
+	case "TodoWrite", "SwitchMode":
+		return "Other"
+	case "WebSearch", "WebFetch",
+		"GenerateImage", "AskQuestion",
+		"CreatePlan", "CallMcpTool",
+		"FetchMcpResource":
+		return "Other"
+
 	default:
 		return "Other"
 	}
